@@ -7,14 +7,14 @@ import os
 app = Flask(__name__)
 app.secret_key = "secret123"
 
-# ---------------- LOAD FILES SAFELY ----------------
+# ---------------- LOAD FILES ----------------
 model = pickle.load(open("model.pkl", "rb"))
 cols = pickle.load(open("columns.pkl", "rb"))
 accuracy = pickle.load(open("accuracy.pkl", "rb"))
 
 DB_PATH = "health.db"
 
-# ---------------- CREATE TABLE IF NOT EXISTS ----------------
+# ---------------- INIT DB ----------------
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -41,27 +41,27 @@ def init_db():
 
 init_db()
 
-# ---------------- SAVE TO DB ----------------
+# ---------------- SAVE DATA ----------------
 def save_to_db(data):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
     c.execute('''
-    INSERT INTO records (age, gender, bp, cholesterol, glucose, smoking, alcohol, exercise, bmi, family, result)
+    INSERT INTO records 
+    (age, gender, bp, cholesterol, glucose, smoking, alcohol, exercise, bmi, family, result)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', data)
 
     conn.commit()
     conn.close()
 
-# ---------------- GET CHART DATA ----------------
+# ---------------- CHART DATA ----------------
 def get_chart_data():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
     c.execute("SELECT age, bp, bmi FROM records ORDER BY id DESC LIMIT 10")
     data = c.fetchall()
-
     conn.close()
 
     data = data[::-1]
@@ -72,6 +72,29 @@ def get_chart_data():
 
     return ages, bp, bmi
 
+# ---------------- HEALTH SCORE ----------------
+def calculate_score(bp, cholesterol, glucose, smoking, alcohol, exercise, bmi, family):
+    score = 100
+
+    if smoking == 1:
+        score -= 15
+    if alcohol == 1:
+        score -= 10
+    if bmi > 30:
+        score -= 20
+    if bp > 140:
+        score -= 15
+    if cholesterol > 240:
+        score -= 15
+    if glucose > 140:
+        score -= 15
+    if exercise == 0:
+        score -= 10
+    if family == 1:
+        score -= 10
+
+    return max(score, 10)
+
 # ---------------- LOGIN ----------------
 @app.route('/', methods=['GET', 'POST'])
 def login():
@@ -80,7 +103,7 @@ def login():
             session['user'] = "admin"
             return redirect('/home')
         else:
-            return render_template("login.html", error="Invalid login")
+            return render_template("login.html", error="Invalid login ❌")
 
     return render_template("login.html")
 
@@ -133,20 +156,23 @@ def predict():
         df = df.reindex(columns=cols, fill_value=0)
 
         pred = model.predict(df)[0]
-
         result = "High Risk ⚠️" if pred == 1 else "Normal ✅"
+
+        score = calculate_score(bp, cholesterol, glucose, smoking, alcohol, exercise, bmi, family)
 
         save_to_db((age, gender, bp, cholesterol, glucose,
                     smoking, alcohol, exercise, bmi, family, result))
 
     except Exception as e:
+        print("ERROR:", e)
         result = "Error ❌"
-        print(e)
+        score = 0
 
     ages, bp, bmi = get_chart_data()
 
     return render_template("index.html",
                            prediction_text=result,
+                           score=score,
                            ages=ages,
                            bp=bp,
                            bmi=bmi,
@@ -174,5 +200,5 @@ def logout():
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))  # IMPORTANT for Render
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
