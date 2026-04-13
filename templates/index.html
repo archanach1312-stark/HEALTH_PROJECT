@@ -1,73 +1,171 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>AI Healthcare</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>AI Healthcare Dashboard</title>
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            background-color: #0f172a;
+            color: white;
+        }
+
+        .card {
+            border-radius: 15px;
+            background: #1e293b;
+        }
+
+        .btn-custom {
+            background: linear-gradient(45deg, #06b6d4, #3b82f6);
+            border: none;
+            color: white;
+        }
+
+        .result-box {
+            padding: 20px;
+            border-radius: 15px;
+            font-size: 20px;
+            text-align: center;
+            margin-top: 20px;
+            font-weight: bold;
+        }
+
+        .high {
+            background: #7f1d1d;
+        }
+
+        .normal {
+            background: #064e3b;
+        }
+    </style>
 </head>
 
-<body class="bg-dark text-white">
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-dark bg-black px-4">
+    <span class="navbar-brand">🧠 AI Healthcare System</span>
+    <div>
+        <a href="/history" class="btn btn-outline-light btn-sm">History</a>
+        <a href="/logout" class="btn btn-danger btn-sm">Logout</a>
+    </div>
+</nav>
 
 <div class="container mt-4">
 
-<div class="d-flex justify-content-between">
-<h2>Healthcare System</h2>
-<div>
-<a href="/history" class="btn btn-secondary">History</a>
-<a href="/logout" class="btn btn-danger">Logout</a>
+    <!-- TITLE -->
+    <h3 class="mb-4">📊 Health Dashboard</h3>
+
+    <div class="row">
+
+        <!-- FORM -->
+        <div class="col-md-6">
+            <div class="card p-4 shadow">
+
+                <h5>🧾 Enter Patient Details</h5>
+
+                <form action="/predict" method="POST">
+
+                    <input name="Age" class="form-control mb-2" placeholder="Age" required>
+
+                    <select name="Gender" class="form-control mb-2">
+                        <option>Male</option>
+                        <option>Female</option>
+                    </select>
+
+                    <input name="Blood Pressure" class="form-control mb-2" placeholder="Blood Pressure">
+
+                    <input name="Cholesterol" class="form-control mb-2" placeholder="Cholesterol">
+
+                    <input name="Glucose" class="form-control mb-2" placeholder="Glucose">
+
+                    <input name="Smoking" class="form-control mb-2" placeholder="Smoking (0/1)">
+
+                    <input name="Alcohol Consumption" class="form-control mb-2" placeholder="Alcohol (0/1)">
+
+                    <input name="Exercise" class="form-control mb-2" placeholder="Exercise (0/1)">
+
+                    <input name="BMI" class="form-control mb-2" placeholder="BMI">
+
+                    <input name="Family History" class="form-control mb-2" placeholder="Family History (0/1)">
+
+                    <button class="btn btn-custom w-100 mt-2">🚀 Predict</button>
+                </form>
+
+                <!-- RESULT -->
+                {% if prediction_text %}
+                    <div class="result-box {% if 'High' in prediction_text %}high{% else %}normal{% endif %}">
+                        {{ prediction_text }}
+                    </div>
+
+                    <!-- SMART SUGGESTIONS -->
+                    <div class="mt-3">
+                        <h6>💡 Suggestions:</h6>
+                        <ul>
+                            <li>🏃 Exercise regularly</li>
+                            <li>🥗 Maintain healthy diet</li>
+                            <li>🚭 Avoid smoking</li>
+                            <li>🧂 Control cholesterol & BP</li>
+                        </ul>
+                    </div>
+                {% endif %}
+
+            </div>
+        </div>
+
+        <!-- CHART -->
+        <div class="col-md-6">
+            <div class="card p-4 shadow">
+
+                <h5>📈 Health Trends</h5>
+                <canvas id="chart"></canvas>
+
+                <hr>
+
+                <h6>🎯 Model Accuracy</h6>
+                <p>{{ accuracy }}%</p>
+
+            </div>
+        </div>
+
+    </div>
+
 </div>
-</div>
 
-<!-- ACCURACY -->
-<div class="alert alert-success mt-3">
-Model Accuracy: <b>{{ accuracy }}%</b>
-</div>
-
-<form action="/predict" method="post" class="card p-3 mt-3">
-<input name="Age" placeholder="Age" class="form-control mb-2">
-<select name="Gender" class="form-control mb-2"><option>Male</option><option>Female</option></select>
-<input name="Blood Pressure" placeholder="BP" class="form-control mb-2">
-<input name="Cholesterol" placeholder="Cholesterol" class="form-control mb-2">
-<input name="Glucose" placeholder="Glucose" class="form-control mb-2">
-<input name="Smoking" placeholder="Smoking" class="form-control mb-2">
-<input name="Alcohol Consumption" placeholder="Alcohol" class="form-control mb-2">
-<input name="Exercise" placeholder="Exercise" class="form-control mb-2">
-<input name="BMI" placeholder="BMI" class="form-control mb-2">
-<input name="Family History" placeholder="Family History" class="form-control mb-2">
-<button class="btn btn-primary">Predict</button>
-</form>
-
-{% if prediction_text %}
-<div class="alert alert-info mt-3 text-center">
-<h4>{{ prediction_text }}</h4>
-</div>
-{% endif %}
-
-<!-- Charts -->
-<canvas id="chart1"></canvas>
-<canvas id="chart2" class="mt-4"></canvas>
-
-</div>
-
+<!-- SAFE DATA PASSING -->
 <script>
-// Health chart
-new Chart(document.getElementById('chart1'), {
-type:'line',
-data:{labels:{{ ages|tojson }},
-datasets:[
-{label:'BP', data:{{ bp|tojson }}},
-{label:'BMI', data:{{ bmi|tojson }}}
-]}
-});
+    const ages = JSON.parse('{{ ages | tojson | safe }}');
+    const bp = JSON.parse('{{ bp | tojson | safe }}');
+    const bmi = JSON.parse('{{ bmi | tojson | safe }}');
 
-// Accuracy chart
-new Chart(document.getElementById('chart2'), {
-type:'bar',
-data:{
-labels:['Accuracy'],
-datasets:[{label:'Model Accuracy', data:[{{ accuracy }}]}]
-}
-});
+    const ctx = document.getElementById('chart');
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ages,
+            datasets: [
+                {
+                    label: 'Blood Pressure',
+                    data: bp,
+                    borderWidth: 2
+                },
+                {
+                    label: 'BMI',
+                    data: bmi,
+                    borderWidth: 2
+                }
+            ]
+        },
+        options: {
+            responsive: true
+        }
+    });
 </script>
 
 </body>
